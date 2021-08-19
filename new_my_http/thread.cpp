@@ -13,7 +13,7 @@ int is_thread_alive(pthread_t tid)
 
 
 //每个线程需要干的任务
-static void *threadpool_thread(void *threadpool) {
+ void *threadpool_thread(void *threadpool) {
 	threadpool_t * pool = (threadpool_t *)threadpool;
 	threadpool_task_t task;
 

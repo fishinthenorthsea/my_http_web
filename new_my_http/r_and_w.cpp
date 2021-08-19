@@ -103,6 +103,7 @@ ssize_t writen(int fd, void *buff, size_t n)
     return writeSum;
 }
 
+
 ssize_t writen(int fd, std::string &sbuff)
 {
     size_t nleft = sbuff.size();
@@ -184,21 +185,6 @@ void send_error(int cfd, int status, char *title, char *text)
 
 
 
-
-
-void disconnect(int cfd, int epfd)
-{
-    printf("cfd == %d!!!!!!!\n",cfd);
-   
-	int ret = epoll_ctl(epfd, EPOLL_CTL_DEL, cfd, NULL);
-    
-	if (ret == -1) {
-		perror("epoll_ctl del cfd error");
-		//exit(1);
-	}
-
-	close(cfd);
-}
 
 
 

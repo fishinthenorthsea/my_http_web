@@ -185,7 +185,6 @@ int main(int argc, char *argv[])
 	}
 
 
-
 	int epollfd = epoll_init();
 	if (epollfd < 0)
 	{
@@ -195,12 +194,9 @@ int main(int argc, char *argv[])
 
 
 	m_connPool = connection_pool::GetInstance();
-    m_connPool->init("192.168.1.135","root","","web", 3306, 10, 1);
+    m_connPool->init("localhost","root","","web", 3306, 10, 1);
 
   
-
-
-
 
 	threadpool_t *tp = pthreadpool_create(4, 100, 65535);
 
@@ -257,7 +253,7 @@ int main(int argc, char *argv[])
 					|| (!(events[i].events & EPOLLIN)))
 				{
 					printf("error event\n");
-					disconnect(fd,epollfd);
+                	delete request;
 					continue;
 				}
 

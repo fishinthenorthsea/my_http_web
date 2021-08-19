@@ -93,8 +93,9 @@ threadpool_t * pthreadpool_create(int min_thr_num, int  max_thr_num, int queue_m
 
 
 int threadpool_add(threadpool_t *pool, void (*function)(void *), void *arg);
-
-
-
+void *threadpool_thread(void *threadpool);
+int threadpool_free(threadpool_t *pool);
+int threadpool_destroy(threadpool_t *pool);
+int threadpool_add(threadpool_t *pool, void (*function)(void *), void *arg);
 
 #endif

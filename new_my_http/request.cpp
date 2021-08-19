@@ -18,13 +18,46 @@ std::priority_queue<mytimer*, deque<mytimer*>, timerCmp> myTimerQueue;
 
 pthread_mutex_t MimeType::lock = PTHREAD_MUTEX_INITIALIZER;
 
+char id[1024];
+char passwd[1024];
+
+
+void spilt_id_passwd(char* line, int tem, int len, int &state) {
+
+	int i_id = 0;
+	int i_passwd = 0;
+	int judge = 0;
+	for (int j = tem; j < len; j++) {
+		if (judge == 0) {
+			if (line[j] == '=') { judge = 1; continue; }
+		}
+		if (judge == 1) {
+			if (line[j] == '&') { id[i_id] = '\0'; judge = 2; continue; }
+			id[i_id++] = line[j];
+		}
+		if (judge == 2) {
+			if (line[j] == '=') { judge = 3; continue; }
+		}
+		if (judge == 3) {
+			passwd[i_passwd++] = line[j];
+		}
+	}
+
+	if (judge != 3) {
+		state = -1;
+		return;
+	}
+	passwd[i_passwd] = '\0';
+}
+
+
 
 
 requestData::requestData() :
 	now_read_pos(0), state(STATE_PARSE_URI), h_state(h_start),
 	keep_alive(false), againTimes(0), timer(NULL)
 {
-	cout << "requestData constructed !" << endl;
+	//cout << "requestData constructed !" << endl;
 }
 
 
@@ -287,10 +320,45 @@ void send_dir(int fd, const char * file) {
 }
 
 
+//first 和 second  代表 ：前后的值
+char first[128];
+char second[128];
 
+void split_line(char *line, int &tem, int state) {
+	int i;
+	for (i = tem;; i++) {
+		
+		if (line[i] == '\0') {
+			state = -1;
+			break;
+		}
+		if (line[i] == ':') {
+			break;
+		}
+		first[i-tem] = line[i];
+	}
+	first[i-tem] = '\0';
+	i += 2;
 
+//	cout<<first<<endl;
 
+	int j = i;
 
+	for (;; i++) {
+		if (line[i] == '\0') {
+			state = -1;
+			break;
+		}
+		if (line[i] == '\r'&&line[i + 1] == '\n')
+		{
+			break;
+		}
+		second[i - j] = line[i];
+	}
+	second[i - j] = '\0';
+	tem = i + 2;
+
+}
 
 void requestData::handleRequest()
 {
@@ -298,164 +366,94 @@ void requestData::handleRequest()
 		int i;
 		char line[4096] = { 0 };
 		char path[2048];
-		int tem= 0;
-		char tchar[1024];
+		int tem = 0;
 		int len;
-		if(1==state){
+		if (1 == state) {
 			len = readn(fd, line, 4096);
-			cout<<line<<endl;
+			cout << line << endl;
 			if (len < 0) {
 				send_error(fd, 404, "Not Found", "NO such file or direntry");
-				state=-1;
+				state = -1;
 				break;
 			}
 			else if (len == 0) {
-				state=-1;
+				state = -1;
 				break;
 			}
 
 			for (i = tem; i < len; i++) {
 				//printf("i=%d %c\n",i,line[i]);
 				if (line[i] == '\r'&&line[i + 1] == '\n') {
-					tchar[i - tem] = line[i];
-					tchar[i - tem+1] = line[i+1];
+					//	tchar[i - tem] = line[i];
+					//	tchar[i - tem + 1] = line[i + 1];
 					break;
 				}
 				else {
-					tchar[i - tem] = line[i];
-
+					//	tchar[i - tem] = line[i];
 				}
 			}
 			if (i >= len) {
-				state=-1;
+				state = -1;
 				break;
 			}
 			tem = i + 2;
 
-		//	cout<<tchar<<endl;
-
 			//strncasecmp-----比较字符串的前n个字符
-			if (strncasecmp(tchar, "GET", 3) == 0 )
-				state=2;
-			else if(strncasecmp(tchar, "POST", 4) == 0)
-				state=3;
-			else{
-				state=-1;
+			if (strncasecmp(line, "GET", 3) == 0)
+				state = 2;
+			else if (strncasecmp(line, "POST", 4) == 0)
+				state = 3;
+			else {
+				state = -1;
 				break;
 			}
 
 
-
-
-			while (tem < len)
+			while (tem<len)
 			{
-			//	printf("%d %d\n", tem, len);
-
 				if (line[tem] == '\r') {
 					break;
 				}
 
-				for (i = tem; i < len; i++) {
+				split_line(line,tem,state);
 				
-					if (line[i] == '\r'&&line[i + 1] == '\n') {
-					
-						tchar[i - tem] = line[i];
-						tchar[i - tem + 1] = line[i + 1];
-						break;
-					}
-					else {
-						tchar[i - tem] = line[i];
-					}
-				}
-
-				if (i >= len) {
-					state=-1;
-					break;
-				}
-				//cout<<"state:"<<state<<endl;
-				tchar[i - tem + 2] = '\0';
-				tem = i + 2;
-
-				//tchar负责分割行 
-				//first 和 second  代表 ：前后的值
-				char first[128];
-				char second[128];
-
-				for (i = 0;; i++) {
-					if (tchar[i] == '\0') {
-						state=-1;
-						break;
-					}
-					if (tchar[i] == ':') {
-						break;
-					}
-					first[i] = tchar[i];
-				}
-
-				first[i] = '\0';
-				i += 2;
-
-				int j = i;
-
-				for (;; i++) {
-					if (tchar[i] == '\0') {
-						state=-1;
-						break;
-					}
-					if (tchar[i] == '\r'&&tchar[i + 1] == '\n')
-					{
-					
-						break;
-					}
-					second[i - j] = tchar[i];
-				}
-
-				second[i - j] = '\0';
-
-			//	printf("first=%s  second = %s!\n",first,second);
+				//printf("first=%s second = %s!\n",first,second);
 				if (strcmp(second, "keep-alive") == 0) {
 					keep_alive = true;
 				}
+
 			}
-
-
-		
 		}
 
-		if(2==state){  //GET
+		if (2 == state) {  //GET
 			int j;
-			int judge=0;
-			for(j=4;;j++){
-				if(line[j]=='?') judge=1;
-				if(line[j]==' ') break;
-				path[j-4]=line[j];
+			int judge = 0;
+			for (j = 4;; j++) {
+				if (line[j] == '?') judge = 1;
+				if (line[j] == ' ') break;
+				path[j - 4] = line[j];
 			}
-			path[j-4]='\0';
+			path[j - 4] = '\0';
 			//printf("\npath=%s\n",path);
 
-			if(judge==1)
-				state=4;
+			if (judge == 1)
+				state = 4;
 			else
-				state=5;
+				state = 5;
 
 		}
-		if(3==state){   //POST
-			cout << "it is post!!!!!!" << endl;
-			int j=5;
-
-			int judge = 0;
-
-			for (j = 5;j<len; j++) {
+		if (3 == state) {   //POST
+		//	cout << "it is post!!!!!!" << endl;
+			int j = 5;
+			for (j = 5; j < len; j++) {
 				if (line[j] == ' ') break;
 				path[j - 5] = line[j];
 			}
-	
-			path[j - 5] = '\0';
-			 printf("\npath=%s\n",path);
 
-			j = 0;
-			char post[1024];
-				
+			path[j - 5] = '\0';
+
+		
+
 			while (tem < len)
 			{
 				if (line[tem] != ' '&&line[tem] != '\r'&&line[tem] != '\n') {
@@ -463,48 +461,13 @@ void requestData::handleRequest()
 				}
 				tem++;
 			}
-			
-			char id[1024];
-			int i_id = 0;
+			spilt_id_passwd(line, tem, len, state);
 
-			char passwd[1024];
-			int i_passwd = 0;
-			judge = 0;
+			//printf("%s-------%s-------\n", id, passwd);
 
-			for (j = tem; j < len; j++) {
-				
-				if (judge == 0) {
-					if (line[j] == '=') { judge = 1; continue; }
-				}
-				if (judge == 1) {
-		
-					if (line[j] == '&') { id[i_id] = '\0'; judge = 2; continue; }
-				
-					id[i_id++] = line[j];
-				}
-				if (judge == 2) {
-					if (line[j] == '=') { judge = 3; continue; }
-				}
-				if (judge == 3) {
-					passwd[i_passwd++] = line[j];
-				}
-			}
-			//cout<<judge<<endl;
-
-			if (judge != 3) {
-				state = -1;
-				break;
-			}
-			passwd[i_passwd] = '\0';
-
-			printf("%s-------%s-------\n",id,passwd);
-
-			cout<<"?????";
-			
 			MYSQL *mysql = NULL;
-			
 			connectionRAII mysqlcon(&mysql, m_connPool);
-			
+
 			char sql[1024] = { 0 };
 			sprintf(sql, "SELECT * FROM people where id='%s' and passwd='%s'", id, passwd);
 
@@ -521,73 +484,44 @@ void requestData::handleRequest()
 			state = 5;
 
 		}
-		if(4==state){   //get ---- ?
-			char id[1024];
-			int i_id=0;
+		if (4 == state) {   //get ---- ?
+			spilt_id_passwd(path, 0, len, state);
 
-			char passwd[1024];
-			int i_passwd=0;
-			int judge=0;
-			for(int j=0;;j++){
-				if(path[j]=='\0') break;
-				if(path[j]==' ') break;
-				if(path[j]=='?'){path[j]='\0' ;judge=1;continue;}
-				if(judge==1){
-					if(path[j]=='=') {judge=2;continue;}
-				}
-				if(judge==2){
-					if(path[j]=='&') {id[i_id]='\0'; judge=3;continue;}
-					id[i_id++]=path[j];
-				}
-				if(judge==3){
-					if(path[j]=='=') {judge=4;continue;}
-				}
-				if(judge==4){
-					passwd[i_passwd++]=path[j];
-				}
-			}
-			passwd[i_passwd]='\0';
 
-			if(judge!=4){
-			    state=-1;
-			    break;
+			for (int j = 0;; j++) {
+				if (path[j] == '?') { path[j] = '\0'; break; }
 			}
 
-		//	printf("%s-------%s\n",id,passwd);
 
 			MYSQL *mysql = NULL;
 
-    		connectionRAII mysqlcon(&mysql, m_connPool);
-			char sql[1024]={0};
-			sprintf(sql, "SELECT * FROM people where id='%s' and passwd='%s'", id,passwd );
-		//	cout<<sql<<endl;
+			connectionRAII mysqlcon(&mysql, m_connPool);
+			char sql[1024] = { 0 };
+			sprintf(sql, "SELECT * FROM people where id='%s' and passwd='%s'", id, passwd);
+			
 
 			if (mysql_query(mysql, sql))
-			//if (mysql_query(mysql, "SELECT * FROM people"))
-		    {
+			{
 				printf("mysql_restore_result(): %s\n", mysql_error(mysql));
-  			}
-			//从表中检索完整的结果集
-    		MYSQL_RES *result = mysql_store_result(mysql);
-			if(!mysql_fetch_row(result)){
-				strcpy(path,"/error.html");
 			}
-			state=5;
+			//从表中检索完整的结果集
+			MYSQL_RES *result = mysql_store_result(mysql);
+			if (!mysql_fetch_row(result)) {
+				strcpy(path, "/error.html");
+			}
+			state = 5;
 		}
+		if (5 == state) {   //get no ?
+		//	cout << "path is" << path << endl;
 
-
-
-		if(5==state){   //get no ?
-			cout<<"path is"<<path<<endl;
 			decode_str(path, path);
-
 			char *file = path + 1;
 
 			if (strcmp(path, "/") == 0) {
 				file = "./";
 			}
 
-				//printf("file = %s\n",file);
+			//printf("file = %s\n",file);
 
 			struct stat sbuf;
 
@@ -596,7 +530,7 @@ void requestData::handleRequest()
 
 			if (ret == -1) {
 				send_error(fd, 404, "Not Found", "NO such file or direntry");
-                state=-1;
+				state = -1;
 				break;
 			}
 			if (S_ISDIR(sbuf.st_mode)) {  		// 目录
@@ -623,15 +557,12 @@ void requestData::handleRequest()
 
 
 
-	
 
-	if(-1==state||keep_alive==false){
+	
+	if (-1 == state || keep_alive == false) {
 		delete this;
 		return;
 	}
-
-	cout<<"chang";
-
 
 
 	this->reset();
@@ -660,7 +591,7 @@ void requestData::handleRequest()
 
 requestData::~requestData()
 {
-//	cout << "~requestData()" << endl;
+	//	cout << "~requestData()" << endl;
 	struct epoll_event ev;
 	// 超时的一定都是读请求，没有"被动"写。
 	ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
@@ -773,10 +704,10 @@ mytimer::mytimer(requestData *_request_data, int timeout) : deleted(false), requ
 
 mytimer::~mytimer()
 {
-//	cout << "~mytimer()" << endl;
+	//	cout << "~mytimer()" << endl;
 	if (request_data != NULL)
 	{
-		cout << "request_data=" << request_data << endl;
+		//cout << "request_data=" << request_data << endl;
 		delete request_data;
 		request_data = NULL;
 	}
